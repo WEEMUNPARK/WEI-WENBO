@@ -1,54 +1,134 @@
-from __future__ import print_function
+from tensorflow import keras
 from sklearn.model_selection import train_test_split
-import keras.regularizers
-from keras.preprocessing import sequence
-from keras.models import Sequential
-from keras.layers import Dense, Embedding
-from keras.layers import LSTM
-from keras.datasets import imdb
+import tensorflow.keras.regularizers
+from tensorflow.keras.preprocessing import sequence
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import Dense, Embedding
+from tensorflow.keras.layers import LSTM
+from tensorflow.keras.datasets import imdb
 import numpy as np
-from keras.optimizers import SGD
+import matplotlib as matplot
+import tensorflow as tf
+from matplotlib import pyplot as plt
+import tensorflow as tf
+#from tensorflow.keras.models import load_model
+import math
+# from tensorflow.keras.callbacks import ModelCheckpoint, CSVLogger, EarlyStopping
 
-#set up hyperparameters
-max_features = 50000
-maxlen=500
+# set up hyperparameters
+# max_features = 50000
+maxlen = 500
 batch_size = 128
+VOCAB_size = 4000
 
-print('Loading data...') #just in case accident happens, can find out the problem more easily(in which part)
 
-(train_data,train_labels),(test_data,test_labels) = imdb.load_data(num_words=50000)
-a=np.append(train_data,test_data)
-b=np.append(train_labels,test_labels)
-x_train=a[:35000]
-y_train=b[:35000]
-x_test=a[35000:]
-y_test=b[35000:]
+# input_length=500
+# LSTM player=60
+# embedding player=32
+# dropout=0.1
+# lr=0.005
+# l2 regulizer=0.001
 
-x_train = sequence.pad_sequences(x_train, maxlen=maxlen)
-x_test = sequence.pad_sequences(x_test, maxlen=maxlen)
+#class PrintWeightsCallback(tf.keras.callbacks.Callback):
+    #def on_epoch_begin(self, epoch, logs=None):
+        #l1_w = self.model.layers[1].weights[0].numpy()[:6, 0]
+        #print(f'layer1: {l1_w}')
+
+
+print('Loading data...')  # just in case accident happens, can find out the problem more easily(in which part)
+
+(train_data, train_labels), (test_data, test_labels) = imdb.load_data(num_words=4000)
+
+np.random.shuffle(train_labels[:int(0.1*len(train_labels))])
+#train_labels=sorted(zip(train_data,train_labels), key=lambda s: len(s[0]), reverse=True)
+train_data = sequence.pad_sequences(train_data, maxlen=maxlen,padding='post', truncating='post')
+test_data = sequence.pad_sequences(test_data, maxlen=maxlen,padding='post', truncating='post')
+#test_labels= sorted(zip(test_data,test_labels), key=lambda s: len(s[0]), reverse=True)
+#test_data=sorted(test_data,key=len,reverse=True)
+a = np.concatenate((train_data, test_data),axis=0)
+
+# np.random.shuffle(a)#20%of
+#np.random.shuffle(train_labels[int(0.8*len(train_labels)):])
+#np.random.shuffle(test_labels[int(0.8*len(test_labels)):])
+b = np.concatenate((train_labels, test_labels),axis=0)
+
+#np.random.shuffle(b[int(0.8*len(b)):])
+x_train = a[:int(0.7 * len(a))]
+y_train = b[:int(0.7 * len(b))]
+x_test = a[int(0.7 * len(a)):]
+y_test = b[int(0.7 * len(b)):]
+#for i in range(len(y_train)):
+    #if i%5000==0:
+        #np.random.shuffle(y_train[i:i+999])
+
+
 print('x_train shape:', x_train.shape)
 print('x_test shape:', x_test.shape)
 
-print('Build model...')
 
-#set up keras LSTM nn
+# set up keras LSTM nn
 model = Sequential()
-model.add(Embedding(max_features, 32))
-model.add(LSTM(60, dropout=0.1, kernel_regularizer=keras.regularizers.l2(0.001)))
+model.add(Embedding(VOCAB_size, output_dim=32, input_length=500))
+model.add(LSTM(60))
 model.add(Dense(1, activation='sigmoid'))
-opt = keras.optimizers.Adam(lr=0.005)
+opt = tensorflow.keras.optimizers.Adam(lr=0.0005)
 
 model.compile(loss='binary_crossentropy',
               optimizer=opt,
               metrics=['accuracy'])
-print('Train...')
 
-#start training (epochs can be changed)
-model.fit(x_train, y_train,
-          batch_size=batch_size,
-          epochs=10,
-          validation_data=(x_test, y_test))
-score, acc = model.evaluate(x_test, y_test,
-                            batch_size=batch_size)
-print('Test score:', score)
-print('Test accuracy:', acc)
+#model.predict(x_test)
+
+checkpoint_filepath='LSTMshuf/weights.{epoch:02d}-{val_loss:.2f}.hdf5'
+
+model_checkpoint_callback = tf.keras.callbacks.ModelCheckpoint(
+    filepath=checkpoint_filepath,
+    monitor= 'val_loss',
+    verbose= 0,
+    save_best_only= False,
+    save_weights_only = False,
+    mode= 'auto',
+    save_freq='epoch',
+    options=None,
+    initial_value_threshold=None
+)
+
+history = model.fit(x_train, y_train,
+                    batch_size=batch_size,
+                    epochs=1500,
+                    validation_data=(x_test, y_test),
+                     callbacks=[model_checkpoint_callback])
+
+acc = history.history['accuracy']
+val_acc = history.history['val_accuracy']
+loss = history.history['loss']
+val_loss = history.history['val_loss']
+epochs = range(len(acc))
+
+
+log_loss=[]
+for e in loss:
+    b=math.log(e)
+    log_loss.append(b)
+log_val_loss=[]
+for e in val_loss:
+    a=math.log(e)
+    log_val_loss.append(a)
+
+plt.plot(epochs, acc, 'r', label='Training accuracy')
+plt.plot(epochs, val_acc, 'b', label='validation accuracy')
+plt.title('Training and validation accuracy')
+plt.legend(loc='lower right')
+plt.figure()
+
+plt.plot(epochs, loss, 'r', label='Training loss')
+plt.plot(epochs, val_loss, 'b', label='validation loss')
+plt.title('Training and validation loss')
+plt.legend()
+plt.show()
+
+plt.plot(epochs, log_loss, 'r', label='Training loss via log')
+plt.plot(epochs, log_val_loss, 'b', label='validation loss via log')
+plt.title('Training and validation log_loss')
+plt.legend()
+plt.show()
