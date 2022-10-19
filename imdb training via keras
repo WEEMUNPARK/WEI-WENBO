@@ -35,7 +35,7 @@ VOCAB_size = 4000
         #print(f'layer1: {l1_w}')
 
 
-print('Loading data...')  # just in case accident happens, can find out the problem more easily(in which part)
+print('Loading data check')  # just in case accident happens, can find out the problem more easily(in which part)
 
 (train_data, train_labels), (test_data, test_labels) = imdb.load_data(num_words=4000)
 
@@ -132,3 +132,4 @@ plt.plot(epochs, log_val_loss, 'b', label='validation loss via log')
 plt.title('Training and validation log_loss')
 plt.legend()
 plt.show()
+#plt.save('name.pdf')
